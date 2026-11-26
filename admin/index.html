@@ -104,7 +104,7 @@ input[type=checkbox]{accent-color:#7C3AED;width:18px;height:18px}
 <div class="live"><b>Your Portfolio is Live!</b><a class="pill" href="/" target="_blank" rel="noopener">View Website →</a></div></aside>
 <main><header class="top"><button id="mb" aria-label="Menu">☰</button><div class="search">🔍<input id="q" placeholder="Search anything… (e.g. projects)"></div><span class="sp"></span><button class="bell" id="bell" aria-label="Messages">🔔<i id="bellc" hidden></i></button><button id="out" class="btn">Logout</button></header>
 <div class="pagehd" hidden><h1 id="ttl"></h1><button id="add" class="btn" hidden>Add new</button></div><section id="view"><p class="empty">Loading…</p></section></main>
-<div id="login" class="login" hidden><form id="lf" class="lbox"><div class="brand"><b>N</b><span>Portfolio Admin</span></div><h1>Sign in <small style="font-size:.6rem;opacity:.5">v4</small></h1>
+<div id="login" class="login"><form id="lf" class="lbox"><div class="brand"><b>N</b><span>Portfolio Admin</span></div><h1>Sign in <small style="font-size:.6rem;opacity:.5">v4</small></h1>
 <label>Email<input id="le" type="email" required autocomplete="username"></label><label>Password<input id="lp" type="password" required autocomplete="current-password"></label>
 <p id="lerr" class="err" role="alert"></p><button type="button" class="btn" id="lgo">Sign in</button></form></div>
 <div id="modal" class="modal" hidden><form id="mf" class="mbox"></form></div><div id="toast" role="status"></div>
@@ -150,6 +150,7 @@ async function boot(){
     const{data:adm,error}=await sb.rpc("is_admin");
     if(error||!adm){await sb.auth.signOut();return showLogin(loginMsg(error||new Error("NOTADMIN")))}
     document.body.classList.remove("noauth");
+    $("#login").hidden=true;
     $("#em").textContent=session.user.email;
     sb.from("profile").select("name,photo_url").eq("id",1).maybeSingle().then(({data:p})=>{if(p){$("#pn").textContent=p.name||"Admin";$("#pimg").textContent=(p.name||"N")[0];if(p.photo_url){$("#pimg").style.backgroundImage=`url("${p.photo_url}")`;$("#pimg").textContent=""}}});
     $("#bell").onclick=()=>location.hash="#contact";
