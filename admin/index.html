@@ -145,23 +145,28 @@ const F=m=>m.fields.map(f=>{const[k,t,...l]=f.split(":");return{k,t,l:l.join(":"
 let cur="home",unread=0;const SUB={journey:["education","experience","certificates"]};
 
 async function boot(){
- const{data:{session}}=await sb.auth.getSession();if(!session)return showLogin();
- const{data:adm,error}=await sb.rpc("is_admin");
- if(error||!adm){await sb.auth.signOut();return showLogin(loginMsg(error||new Error("NOTADMIN")))}
- document.body.classList.remove("noauth");
- $("#em").textContent=session.user.email;
- sb.from("profile").select("name,photo_url").eq("id",1).maybeSingle().then(({data:p})=>{if(p){$("#pn").textContent=p.name||"Admin";$("#pimg").textContent=(p.name||"N")[0];if(p.photo_url){$("#pimg").style.backgroundImage=`url("${p.photo_url}")`;$("#pimg").textContent=""}}});
- $("#bell").onclick=()=>location.hash="#contact";
- $("#q").onkeydown=e=>{if(e.key==="Enter"){const v=e.target.value.trim().toLowerCase();const k=Object.keys(M).filter(k=>!M[k].hidden).find(k=>k.includes(v)||M[k].label.toLowerCase().includes(v));if(k)location.hash="#"+k;else toast("No section found")}};
- $("#out").onclick=async()=>{await sb.auth.signOut();location.reload()};
- $("#dm").onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==="dark"?"light":"dark";localStorage.at=d.dataset.theme};
- document.documentElement.dataset.theme=localStorage.at||"dark";
- try{document.body.classList.toggle("sbc",localStorage.sbc==="1")}catch(e){}
- $("#sbt").onclick=()=>{const c=document.body.classList.toggle("sbc");try{localStorage.sbc=c?"1":"0"}catch(e){}};
- $("main").onclick=e=>{if(e.target===e.currentTarget)$("#side").classList.remove("open")};
- $("#modal").onclick=e=>{if(e.target.id==="modal")e.target.hidden=true};
- $("#mb").onclick=()=>$("#side").classList.toggle("open");
- addEventListener("hashchange",route);await badge();route()}
+  try{
+    const{data:{session}}=await sb.auth.getSession();if(!session)return showLogin();
+    const{data:adm,error}=await sb.rpc("is_admin");
+    if(error||!adm){await sb.auth.signOut();return showLogin(loginMsg(error||new Error("NOTADMIN")))}
+    document.body.classList.remove("noauth");
+    $("#em").textContent=session.user.email;
+    sb.from("profile").select("name,photo_url").eq("id",1).maybeSingle().then(({data:p})=>{if(p){$("#pn").textContent=p.name||"Admin";$("#pimg").textContent=(p.name||"N")[0];if(p.photo_url){$("#pimg").style.backgroundImage=`url("${p.photo_url}")`;$("#pimg").textContent=""}}});
+    $("#bell").onclick=()=>location.hash="#contact";
+    $("#q").onkeydown=e=>{if(e.key==="Enter"){const v=e.target.value.trim().toLowerCase();const k=Object.keys(M).filter(k=>!M[k].hidden).find(k=>k.includes(v)||M[k].label.toLowerCase().includes(v));if(k)location.hash="#"+k;else toast("No section found")}};
+    $("#out").onclick=async()=>{await sb.auth.signOut();location.reload()};
+    $("#dm").onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==="dark"?"light":"dark";localStorage.at=d.dataset.theme};
+    document.documentElement.dataset.theme=localStorage.at||"dark";
+    try{document.body.classList.toggle("sbc",localStorage.sbc==="1")}catch(e){}
+    $("#sbt").onclick=()=>{const c=document.body.classList.toggle("sbc");try{localStorage.sbc=c?"1":"0"}catch(e){}};
+    $("main").onclick=e=>{if(e.target===e.currentTarget)$("#side").classList.remove("open")};
+    $("#modal").onclick=e=>{if(e.target.id==="modal")e.target.hidden=true};
+    $("#mb").onclick=()=>$("#side").classList.toggle("open");
+    addEventListener("hashchange",route);await badge();route()
+  }catch(e){
+    console.error("boot error:",e);return showLogin(loginMsg(e));
+  }
+}
 async function badge(){const{count}=await sb.from("contact_messages").select("*",{count:"exact",head:true}).eq("is_read",false);unread=count||0;const bi=$("#bellc");if(bi){bi.textContent=unread;bi.hidden=!unread}
  $("#nav").innerHTML=Object.entries(M).filter(([k,m])=>!m.hidden).map(([k,m])=>`<a href="#${k}" class="${k===cur?"on":""}"><span class="ni">${m.icon}</span><span class="nl">${m.label}</span>${k==="contact"&&unread?`<i>${unread}</i>`:""}</a>`).join("")}
 function route(){const _o=document.getElementById("pvfull");if(_o)_o.remove();cur=location.hash.slice(1);if(!M[cur]||M[cur].hidden)cur="dashboard";$("#side").classList.remove("open");const m=M[cur];if(!m.prev)window._last="#"+cur;$("#ttl").textContent=m.label;document.querySelector(".pagehd").hidden=false;if(m.dash){document.querySelector(".pagehd").hidden=true;$("#add").hidden=true;badge();return dash()}
@@ -745,5 +750,5 @@ function showLogin(msg){document.body.classList.add("noauth");$("#login").hidden
   }catch(e){console.error(e);$("#login").hidden=false;document.body.classList.add("noauth");er.style.color="";er.textContent=loginMsg(e);b.disabled=false;b.textContent="Sign in"}};
  b.onclick=go;$("#lf").onsubmit=e=>e.preventDefault();
  ["#le","#lp"].forEach(i=>$(i).onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();go()}})}
-boot().catch(e=>{document.body.classList.remove("noauth");$("#view").innerHTML='<p class="empty">Something went wrong: '+esc(e.message)+'</p>'});
+boot().catch(e=>{console.error(e);showLogin(loginMsg(e))});
 </script></body></html>
