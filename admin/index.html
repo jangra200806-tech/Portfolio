@@ -118,6 +118,8 @@ window.CONFIG = {
 </script>
 <script>if(typeof supabase==="undefined"){document.body.innerHTML="<p style='padding:30px;font-family:sans-serif'>Could not load the Supabase library. Check your internet connection and reload.</p>";throw new Error("no supabase")}
 const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
+console.log("[Config] Supabase URL:",CONFIG.SUPABASE_URL);
+console.log("[Config] Supabase client created:",!!sb);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&","<":"<",">":">",'"':""","'":"'"}[c]));
 const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),2600)};
@@ -127,25 +129,34 @@ let loginHandlerAttached=false;
 function attachLoginHandlers(){
   if(loginHandlerAttached)return;
   const form=$("#lf"), btn=$("#lgo"), err=$("#lerr"), emailEl=$("#le"), passEl=$("#lp");
-  if(!form||!btn||!err||!emailEl||!passEl){console.warn("Login elements not found");return}
+  if(!form||!btn||!err||!emailEl||!passEl){console.warn("[Login] Elements not found:",{form,btn,err,emailEl,passEl});return}
+  console.log("[Login] Handlers attached");
   const attemptLogin=async(e)=>{
+    console.log("[Login] Attempt started",{type:e?.type,target:e?.target?.id});
     if(e){e.preventDefault();e.stopPropagation()}
-    if(btn.disabled)return false;
+    if(btn.disabled){console.log("[Login] Button disabled, aborting");return false;}
     btn.disabled=true;btn.textContent="Signing in…";err.style.color="var(--mut)";err.textContent="Sign in ho raha hai…";
     try{
       const email=emailEl.value.trim(), password=passEl.value;
+      console.log("[Login] Credentials entered",{email,hasPassword:!!password});
       if(!email||!password)throw new Error("Email aur password dono bharo.");
-      const{error}=await sb.auth.signInWithPassword({email,password});
+      console.log("[Login] Calling signInWithPassword…");
+      const{data:authData,error}=await sb.auth.signInWithPassword({email,password});
+      console.log("[Login] signInWithPassword response",{authData,error});
       if(error)throw error;
+      console.log("[Login] Auth success, session:",sb.auth.getSession());
       err.textContent="Password sahi hai. Admin check ho raha hai…";
+      console.log("[Login] Calling is_admin() RPC…");
       const{data:adm,error:ae}=await sb.rpc("is_admin");
-      if(ae||!adm){await sb.auth.signOut();throw ae||new Error("NOTADMIN")}
+      console.log("[Login] is_admin() response",{adm,error:ae});
+      if(ae||!adm){console.warn("[Login] NOTADMIN or RPC error",{ae,adm});await sb.auth.signOut();throw ae||new Error("NOTADMIN")}
+      console.log("[Login] Admin verified, starting boot()");
       err.textContent="Login ho gaya, dashboard khul raha hai…";
       $("#login").hidden=true;
       document.body.classList.remove("noauth");
       await boot();
     }catch(e){
-      console.error("Login error:",e);
+      console.error("[Login] ERROR:",e?.message||e, e);
       $("#login").hidden=false;
       document.body.classList.add("noauth");
       err.style.color="";err.textContent=loginMsg(e);
@@ -162,6 +173,9 @@ function attachLoginHandlers(){
 // Initialize login handlers when DOM is ready
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",attachLoginHandlers);
 else attachLoginHandlers();
+
+// Debug: Test is_admin() RPC on page load
+sb.rpc("is_admin").then(({data,error})=>console.log("[Debug] is_admin() test",{data,error}));
 // field format: key:type:Label  (types: text, area, number, bool, image, file)
 const pub=["sort:number:Display order","published:bool:Show on website"];
 const gal=(c,label,icon)=>({label,icon,table:"gallery_items",cat:c,fields:["title:text:Title","description:area:Description","image_url:image:Image",...pub]});
@@ -186,10 +200,16 @@ const F=m=>m.fields.map(f=>{const[k,t,...l]=f.split(":");return{k,t,l:l.join(":"
 let cur="home",unread=0;const SUB={journey:["education","experience","certificates"]};
 
 async function boot(){
+  console.log("[Boot] Starting");
   try{
-    const{data:{session}}=await sb.auth.getSession();if(!session)return showLogin();
+    const{data:{session}}=await sb.auth.getSession();
+    console.log("[Boot] getSession result",{session:session?{user:session.user?.email,expires:session.expires_at}:"none"});
+    if(!session){console.log("[Boot] No session, showing login");return showLogin();}
+    console.log("[Boot] Session found, calling is_admin()");
     const{data:adm,error}=await sb.rpc("is_admin");
-    if(error||!adm){await sb.auth.signOut();return showLogin(loginMsg(error||new Error("NOTADMIN")))}
+    console.log("[Boot] is_admin() result",{adm,error});
+    if(error||!adm){console.warn("[Boot] Admin check failed",{error,adm});await sb.auth.signOut();return showLogin(loginMsg(error||new Error("NOTADMIN")))}
+    console.log("[Boot] Admin verified, loading dashboard");
     document.body.classList.remove("noauth");
     $("#login").hidden=true;
     $("#em").textContent=session.user.email;
@@ -206,7 +226,7 @@ async function boot(){
     $("#mb").onclick=()=>$("#side").classList.toggle("open");
     addEventListener("hashchange",route);await badge();route()
   }catch(e){
-    console.error("boot error:",e);return showLogin(loginMsg(e));
+    console.error("[Boot] ERROR:",e?.message||e, e);return showLogin(loginMsg(e));
   }
 }
 async function badge(){const{count}=await sb.from("contact_messages").select("*",{count:"exact",head:true}).eq("is_read",false);unread=count||0;const bi=$("#bellc");if(bi){bi.textContent=unread;bi.hidden=!unread}
