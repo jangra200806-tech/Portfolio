@@ -269,19 +269,20 @@ function openForm(k,row,inline){
   mf.onsubmit=ev=>{ev.preventDefault();save(k,row,inline)}}catch(e){console.error("openForm error:",e);toast("Could not load form: "+e.message)}};go()}
 
 async function save(k,row,inline){
- const m=M[k],mf=window._mf,btn=$("#sv"),o={};btn.disabled=true;btn.textContent="Saving…";
- try{for(const f of F(m)){const el=mf.elements[f.k];if(!el)continue;
-  if(f.t==="bool")o[f.k]=el.checked;
-  else if(f.t==="number")o[f.k]=+el.value||0;
-  else if(f.t==="image"||f.t==="file"){const file=mf.elements[f.k+"_file"].files[0];o[f.k]=el.value||null;
-   if(file){const p=`${k}/${Date.now()}-${file.name.replace(/[^\w.-]/g,"_")}`;const u=await sb.storage.from("media").upload(p,file,{upsert:true});if(u.error)throw u.error;o[f.k]=sb.storage.from("media").getPublicUrl(p).data.publicUrl}}
-  else o[f.k]=el.value.trim()}
- if(m.cat)o.category=m.cat;
- if(m.table==="blog_posts")o.slug=(o.title||"post").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
- let r;for(let n=0;n<6;n++){r=m.single?await sb.from(m.table).upsert({id:1,...o}):row.id?await sb.from(m.table).update(o).eq("id",row.id):await sb.from(m.table).insert(o);
-  const c=/'(\w+)' column/.exec(r.error?.message||"");if(c&&c[1] in o)delete o[c[1]];else break}
- if(r.error)throw r.error;toast("Saved");$("#modal").hidden=true;try{inline?openForm(k,null,true):list(k)}catch(e){console.error("post-save refresh error:",e)}
- catch(e){toast("Could not save: "+e.message);btn.disabled=false;btn.textContent="Save changes"}}
+  const m=M[k],mf=window._mf,btn=$("#sv"),o={};btn.disabled=true;btn.textContent="Saving…";
+  try{for(const f of F(m)){const el=mf.elements[f.k];if(!el)continue;
+   if(f.t==="bool")o[f.k]=el.checked;
+   else if(f.t==="number")o[f.k]=+el.value||0;
+   else if(f.t==="image"||f.t==="file"){const file=mf.elements[f.k+"_file"].files[0];o[f.k]=el.value||null;
+    if(file){const p=`${k}/${Date.now()}-${file.name.replace(/[^\w.-]/g,"_")}`;const u=await sb.storage.from("media").upload(p,file,{upsert:true});if(u.error)throw u.error;o[f.k]=sb.storage.from("media").getPublicUrl(p).data.publicUrl}}
+   else o[f.k]=el.value.trim()}
+  if(m.cat)o.category=m.cat;
+  if(m.table==="blog_posts")o.slug=(o.title||"post").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  let r;for(let n=0;n<6;n++){r=m.single?await sb.from(m.table).upsert({id:1,...o}):row.id?await sb.from(m.table).update(o).eq("id",row.id):await sb.from(m.table).insert(o);
+   const c=/'(\w+)' column/.exec(r.error?.message||"");if(c&&c[1] in o)delete o[c[1]];else break}
+  if(r.error)throw r.error;toast("Saved");$("#modal").hidden=true;
+  try{inline?openForm(k,null,true):list(k)}catch(e){console.error("post-save refresh error:",e)}
+  }catch(e){toast("Could not save: "+e.message);btn.disabled=false;btn.textContent="Save changes"}}
 function ask(msg,ok){return new Promise(r=>{const del=/delete/i.test(ok||""),d=document.createElement("div");d.className="modal";d.innerHTML=`<div class="mbox cbox"><div class="cico">${del?"🗑":"⬇"}</div><p></p><div class="acts"><button type="button" class="btn sec" data-v="0">Cancel</button><button type="button" class="btn ${del?"del":""}" data-v="1">${ok||"Continue"}</button></div></div>`;d.querySelector("p").textContent=msg;const f=v=>{d.remove();r(v)};d.onclick=e=>{const v=e.target.dataset&&e.target.dataset.v;if(v!==undefined)f(v==="1");else if(e.target===d)f(false)};d.onkeydown=e=>{if(e.key==="Escape")f(false)};document.body.appendChild(d);d.querySelector("[data-v='1']").focus()})}
 function qa(k){if(location.hash==="#"+k)route();else location.hash="#"+k;setTimeout(()=>{const a=$("#add");if(a&&!a.hidden)a.click()},300)}
 function countUp(root){if(matchMedia("(prefers-reduced-motion:reduce)").matches)return;root.querySelectorAll("[data-n]").forEach(el=>{const n=+el.dataset.n,t0=performance.now(),f=t=>{const q=Math.min(1,(t-t0)/900);el.textContent=Math.round(n*(1-Math.pow(1-q,3)));if(q<1)requestAnimationFrame(f)};requestAnimationFrame(f)})}
