@@ -1,12 +1,4 @@
-# robots.txt for Naina Jangra Portfolio
 User-agent: *
 Allow: /
-
-# Sitemap
+Disallow: /admin
 Sitemap: https://naina-jangra.vercel.app/sitemap.xml
-
-# Disallow admin panel from search engines
-Disallow: /admin/
-
-# Host
-Host: https://naina-jangra.vercel.app
