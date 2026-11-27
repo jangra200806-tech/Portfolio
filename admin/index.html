@@ -104,7 +104,7 @@ input[type=checkbox]{accent-color:#7C3AED;width:18px;height:18px}
 <div class="live"><b>Your Portfolio is Live!</b><a class="pill" href="/" target="_blank" rel="noopener">View Website →</a></div></aside>
 <main><header class="top"><button id="mb" aria-label="Menu">☰</button><div class="search">🔍<input id="q" placeholder="Search anything… (e.g. projects)"></div><span class="sp"></span><button class="bell" id="bell" aria-label="Messages">🔔<i id="bellc" hidden></i></button><button id="out" class="btn">Logout</button></header>
 <div class="pagehd" hidden><h1 id="ttl"></h1><button id="add" class="btn" hidden>Add new</button></div><section id="view"><p class="empty">Loading…</p></section></main>
-<div id="login" class="login"><form id="lf" class="lbox"><div class="brand"><b>N</b><span>Portfolio Admin</span></div><h1>Sign in <small style="font-size:.6rem;opacity:.5">v4</small></h1>
+<div id="login" class="login" hidden><form id="lf" class="lbox"><div class="brand"><b>N</b><span>Portfolio Admin</span></div><h1>Sign in <small style="font-size:.6rem;opacity:.5">v4</small></h1>
 <label>Email<input id="le" type="email" required autocomplete="username"></label><label>Password<input id="lp" type="password" required autocomplete="current-password"></label>
 <p id="lerr" class="err" role="alert"></p><button type="button" class="btn" id="lgo">Sign in</button></form></div>
 <div id="modal" class="modal" hidden><form id="mf" class="mbox"></form></div><div id="toast" role="status"></div>
@@ -118,64 +118,9 @@ window.CONFIG = {
 </script>
 <script>if(typeof supabase==="undefined"){document.body.innerHTML="<p style='padding:30px;font-family:sans-serif'>Could not load the Supabase library. Check your internet connection and reload.</p>";throw new Error("no supabase")}
 const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
-console.log("[Config] Supabase URL:",CONFIG.SUPABASE_URL);
-console.log("[Config] Supabase client created:",!!sb);
 const $=s=>document.querySelector(s);
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&","<":"<",">":">",'"':"&quot;","'":"'"}[c]));
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),2600)};
-
-// Login handler - attached once on DOM ready
-let loginHandlerAttached=false;
-function attachLoginHandlers(){
-  if(loginHandlerAttached)return;
-  const form=$("#lf"), btn=$("#lgo"), err=$("#lerr"), emailEl=$("#le"), passEl=$("#lp");
-  if(!form||!btn||!err||!emailEl||!passEl){console.warn("[Login] Elements not found:",{form,btn,err,emailEl,passEl});return}
-  console.log("[Login] Handlers attached");
-  const attemptLogin=async(e)=>{
-    console.log("[Login] Attempt started",{type:e?.type,target:e?.target?.id});
-    if(e){e.preventDefault();e.stopPropagation()}
-    if(btn.disabled){console.log("[Login] Button disabled, aborting");return false;}
-    btn.disabled=true;btn.textContent="Signing in…";err.style.color="var(--mut)";err.textContent="Sign in ho raha hai…";
-    try{
-      const email=emailEl.value.trim(), password=passEl.value;
-      console.log("[Login] Credentials entered",{email,hasPassword:!!password});
-      if(!email||!password)throw new Error("Email aur password dono bharo.");
-      console.log("[Login] Calling signInWithPassword…");
-      const{data:authData,error}=await sb.auth.signInWithPassword({email,password});
-      console.log("[Login] signInWithPassword response",{authData,error});
-      if(error)throw error;
-      console.log("[Login] Auth success, session:",sb.auth.getSession());
-      err.textContent="Password sahi hai. Admin check ho raha hai…";
-      console.log("[Login] Calling is_admin() RPC…");
-      const{data:adm,error:ae}=await sb.rpc("is_admin");
-      console.log("[Login] is_admin() response",{adm,error:ae});
-      if(ae||!adm){console.warn("[Login] NOTADMIN or RPC error",{ae,adm});await sb.auth.signOut();throw ae||new Error("NOTADMIN")}
-      console.log("[Login] Admin verified, starting boot()");
-      err.textContent="Login ho gaya, dashboard khul raha hai…";
-      $("#login").hidden=true;
-      document.body.classList.remove("noauth");
-      await boot();
-    }catch(e){
-      console.error("[Login] ERROR:",e?.message||e, e);
-      $("#login").hidden=false;
-      document.body.classList.add("noauth");
-      err.style.color="";err.textContent=loginMsg(e);
-      btn.disabled=false;btn.textContent="Sign in"
-    }
-    return false;
-  };
-  form.addEventListener("submit",attemptLogin,{passive:false});
-  btn.addEventListener("click",attemptLogin);
-  [emailEl,passEl].forEach(el=>el.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();attemptLogin(e)}}));
-  loginHandlerAttached=true;
-}
-
-// Initialize login handlers when DOM is ready
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",attachLoginHandlers);
-else attachLoginHandlers();
-
-// Debug: Test is_admin() RPC on page load
-sb.rpc("is_admin").then(({data,error})=>console.log("[Debug] is_admin() test",{data,error}));
 // field format: key:type:Label  (types: text, area, number, bool, image, file)
 const pub=["sort:number:Display order","published:bool:Show on website"];
 const gal=(c,label,icon)=>({label,icon,table:"gallery_items",cat:c,fields:["title:text:Title","description:area:Description","image_url:image:Image",...pub]});
@@ -200,35 +145,23 @@ const F=m=>m.fields.map(f=>{const[k,t,...l]=f.split(":");return{k,t,l:l.join(":"
 let cur="home",unread=0;const SUB={journey:["education","experience","certificates"]};
 
 async function boot(){
-  console.log("[Boot] Starting");
-  try{
-    const{data:{session}}=await sb.auth.getSession();
-    console.log("[Boot] getSession result",{session:session?{user:session.user?.email,expires:session.expires_at}:"none"});
-    if(!session){console.log("[Boot] No session, showing login");return showLogin();}
-    console.log("[Boot] Session found, calling is_admin()");
-    const{data:adm,error}=await sb.rpc("is_admin");
-    console.log("[Boot] is_admin() result",{adm,error});
-    if(error||!adm){console.warn("[Boot] Admin check failed",{error,adm});await sb.auth.signOut();return showLogin(loginMsg(error||new Error("NOTADMIN")))}
-    console.log("[Boot] Admin verified, loading dashboard");
-    document.body.classList.remove("noauth");
-    $("#login").hidden=true;
-    $("#em").textContent=session.user.email;
-    sb.from("profile").select("name,photo_url").eq("id",1).maybeSingle().then(({data:p})=>{if(p){$("#pn").textContent=p.name||"Admin";$("#pimg").textContent=(p.name||"N")[0];if(p.photo_url){$("#pimg").style.backgroundImage=`url("${p.photo_url}")`;$("#pimg").textContent=""}}});
-    $("#bell").onclick=()=>location.hash="#contact";
-    $("#q").onkeydown=e=>{if(e.key==="Enter"){const v=e.target.value.trim().toLowerCase();const k=Object.keys(M).filter(k=>!M[k].hidden).find(k=>k.includes(v)||M[k].label.toLowerCase().includes(v));if(k)location.hash="#"+k;else toast("No section found")}};
-    $("#out").onclick=async()=>{await sb.auth.signOut();location.reload()};
-    $("#dm").onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==="dark"?"light":"dark";localStorage.at=d.dataset.theme};
-    document.documentElement.dataset.theme=localStorage.at||"dark";
-    try{document.body.classList.toggle("sbc",localStorage.sbc==="1")}catch(e){}
-    $("#sbt").onclick=()=>{const c=document.body.classList.toggle("sbc");try{localStorage.sbc=c?"1":"0"}catch(e){}};
-    $("main").onclick=e=>{if(e.target===e.currentTarget)$("#side").classList.remove("open")};
-    $("#modal").onclick=e=>{if(e.target.id==="modal")e.target.hidden=true};
-    $("#mb").onclick=()=>$("#side").classList.toggle("open");
-    addEventListener("hashchange",route);await badge();route()
-  }catch(e){
-    console.error("[Boot] ERROR:",e?.message||e, e);return showLogin(loginMsg(e));
-  }
-}
+ const{data:{session}}=await sb.auth.getSession();if(!session)return showLogin();
+ const{data:adm,error}=await sb.rpc("is_admin");
+ if(error||!adm){await sb.auth.signOut();return showLogin(loginMsg(error||new Error("NOTADMIN")))}
+ document.body.classList.remove("noauth");
+ $("#em").textContent=session.user.email;
+ sb.from("profile").select("name,photo_url").eq("id",1).maybeSingle().then(({data:p})=>{if(p){$("#pn").textContent=p.name||"Admin";$("#pimg").textContent=(p.name||"N")[0];if(p.photo_url){$("#pimg").style.backgroundImage=`url("${p.photo_url}")`;$("#pimg").textContent=""}}});
+ $("#bell").onclick=()=>location.hash="#contact";
+ $("#q").onkeydown=e=>{if(e.key==="Enter"){const v=e.target.value.trim().toLowerCase();const k=Object.keys(M).filter(k=>!M[k].hidden).find(k=>k.includes(v)||M[k].label.toLowerCase().includes(v));if(k)location.hash="#"+k;else toast("No section found")}};
+ $("#out").onclick=async()=>{await sb.auth.signOut();location.reload()};
+ $("#dm").onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==="dark"?"light":"dark";localStorage.at=d.dataset.theme};
+ document.documentElement.dataset.theme=localStorage.at||"dark";
+ try{document.body.classList.toggle("sbc",localStorage.sbc==="1")}catch(e){}
+ $("#sbt").onclick=()=>{const c=document.body.classList.toggle("sbc");try{localStorage.sbc=c?"1":"0"}catch(e){}};
+ $("main").onclick=e=>{if(e.target===e.currentTarget)$("#side").classList.remove("open")};
+ $("#modal").onclick=e=>{if(e.target.id==="modal")e.target.hidden=true};
+ $("#mb").onclick=()=>$("#side").classList.toggle("open");
+ addEventListener("hashchange",route);await badge();route()}
 async function badge(){const{count}=await sb.from("contact_messages").select("*",{count:"exact",head:true}).eq("is_read",false);unread=count||0;const bi=$("#bellc");if(bi){bi.textContent=unread;bi.hidden=!unread}
  $("#nav").innerHTML=Object.entries(M).filter(([k,m])=>!m.hidden).map(([k,m])=>`<a href="#${k}" class="${k===cur?"on":""}"><span class="ni">${m.icon}</span><span class="nl">${m.label}</span>${k==="contact"&&unread?`<i>${unread}</i>`:""}</a>`).join("")}
 function route(){const _o=document.getElementById("pvfull");if(_o)_o.remove();cur=location.hash.slice(1);if(!M[cur]||M[cur].hidden)cur="dashboard";$("#side").classList.remove("open");const m=M[cur];if(!m.prev)window._last="#"+cur;$("#ttl").textContent=m.label;document.querySelector(".pagehd").hidden=false;if(m.dash){document.querySelector(".pagehd").hidden=true;$("#add").hidden=true;badge();return dash()}
@@ -257,32 +190,31 @@ async function list0(k){
  $("#view").innerHTML=`<div class="card">${data.length?data.map((r,i)=>`<div class="row">${img&&r[img.k]?`<img src="${esc(r[img.k])}" alt="">`:""}<div class="t"><b>${esc(r[fs[0].k])||"(untitled)"}</b><small>${esc(r[fs[1]?.k]||"").slice(0,80)}</small></div>${"published"in r&&!r.published?'<span class="badge">Hidden</span>':""}${m.ro?"":`<button class="btn sec" onclick="openForm('${k}',_rows[${i}])">Edit</button>`}<button class="btn del" onclick="delItem('${k}','${r.id}')">Delete</button></div>`).join(""):`<p class="empty">Nothing here yet. ${m.ro?"":"Use “Add new” to create the first one."}</p>`}</div>`}
 
 function openForm(k,row,inline){
-  const m=M[k],mf=window._mf||(window._mf=$("#mf"));const go=async()=>{try{if(inline&&!row){const{data,error}=await sb.from(m.table).select("*").eq("id",1).maybeSingle();if(error)throw error;row=data||{}}
-  row=row||{};const fl=F(m).filter(f=>!row.id||f.k in row);
-  mf.innerHTML=(inline?"":`<h3>${row.id?"Edit":"Add"} ${m.label}</h3>`)+fl.map(f=>{const v=row[f.k];
-    if(f.t==="bool")return`<label class="cb"><input type="checkbox" name="${f.k}" ${(v??true)?"checked":""}> ${f.l}</label>`;
-    if(f.t==="area")return`<label>${f.l}<textarea name="${f.k}">${esc(v)}</textarea></label>`;
-    if(f.t==="image"||f.t==="file")return`<label>${f.l}<input type="file" name="${f.k}_file" accept="${f.t==="image"?"image/*":"application/pdf"}">${v?(f.t==="image"?`<img class="prev" src="${esc(v)}" alt="">`:`<a href="${esc(v)}" target="_blank">Current file</a>`):""}<input type="hidden" name="${f.k}" value="${esc(v)}"></label>`;
-    return`<label>${f.l}<input name="${f.k}" type="${f.t==="number"?"number":"text"}" value="${esc(v??(f.k==="sort"?0:""))}"></label>`}).join("")
-    +`<div class="acts">${inline?"":'<button type="button" class="btn sec" id="cx">Cancel</button>'}<button class="btn" id="sv">Save changes</button></div>`;
-  if(inline){$("#view").innerHTML="";$("#view").appendChild(mf);mf.className="card";$("#modal").hidden=true}else{$("#modal").appendChild(mf);$("#modal").hidden=false;mf.className="mbox";$("#cx").onclick=()=>$("#modal").hidden=true}
-  mf.onsubmit=ev=>{ev.preventDefault();save(k,row,inline)}}catch(e){console.error("openForm error:",e);toast("Could not load form: "+e.message)}};go()}
+ const m=M[k],mf=window._mf||(window._mf=$("#mf"));const go=async()=>{if(inline&&!row){const{data}=await sb.from(m.table).select("*").eq("id",1).maybeSingle();row=data||{}}
+ row=row||{};const fl=F(m).filter(f=>!row.id||f.k in row);
+ mf.innerHTML=(inline?"":`<h3>${row.id?"Edit":"Add"} ${m.label}</h3>`)+fl.map(f=>{const v=row[f.k];
+  if(f.t==="bool")return`<label class="cb"><input type="checkbox" name="${f.k}" ${(v??true)?"checked":""}> ${f.l}</label>`;
+  if(f.t==="area")return`<label>${f.l}<textarea name="${f.k}">${esc(v)}</textarea></label>`;
+  if(f.t==="image"||f.t==="file")return`<label>${f.l}<input type="file" name="${f.k}_file" accept="${f.t==="image"?"image/*":"application/pdf"}">${v?(f.t==="image"?`<img class="prev" src="${esc(v)}" alt="">`:`<a href="${esc(v)}" target="_blank">Current file</a>`):""}<input type="hidden" name="${f.k}" value="${esc(v)}"></label>`;
+  return`<label>${f.l}<input name="${f.k}" type="${f.t==="number"?"number":"text"}" value="${esc(v??(f.k==="sort"?0:""))}"></label>`}).join("")
+  +`<div class="acts">${inline?"":'<button type="button" class="btn sec" id="cx">Cancel</button>'}<button class="btn" id="sv">Save changes</button></div>`;
+ if(inline){$("#view").innerHTML="";$("#view").appendChild(mf);mf.className="card";$("#modal").hidden=true}else{$("#modal").appendChild(mf);$("#modal").hidden=false;mf.className="mbox";$("#cx").onclick=()=>$("#modal").hidden=true}
+ mf.onsubmit=ev=>{ev.preventDefault();save(k,row,inline)}};go()}
 
 async function save(k,row,inline){
-  const m=M[k],mf=window._mf,btn=$("#sv"),o={};btn.disabled=true;btn.textContent="Saving…";
-  try{for(const f of F(m)){const el=mf.elements[f.k];if(!el)continue;
-   if(f.t==="bool")o[f.k]=el.checked;
-   else if(f.t==="number")o[f.k]=+el.value||0;
-   else if(f.t==="image"||f.t==="file"){const file=mf.elements[f.k+"_file"].files[0];o[f.k]=el.value||null;
-    if(file){const p=`${k}/${Date.now()}-${file.name.replace(/[^\w.-]/g,"_")}`;const u=await sb.storage.from("media").upload(p,file,{upsert:true});if(u.error)throw u.error;o[f.k]=sb.storage.from("media").getPublicUrl(p).data.publicUrl}}
-   else o[f.k]=el.value.trim()}
-  if(m.cat)o.category=m.cat;
-  if(m.table==="blog_posts")o.slug=(o.title||"post").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-  let r;for(let n=0;n<6;n++){r=m.single?await sb.from(m.table).upsert({id:1,...o}):row.id?await sb.from(m.table).update(o).eq("id",row.id):await sb.from(m.table).insert(o);
-   const c=/'(\w+)' column/.exec(r.error?.message||"");if(c&&c[1] in o)delete o[c[1]];else break}
-  if(r.error)throw r.error;toast("Saved");$("#modal").hidden=true;
-  try{inline?openForm(k,null,true):list(k)}catch(e){console.error("post-save refresh error:",e)}
-  }catch(e){toast("Could not save: "+e.message);btn.disabled=false;btn.textContent="Save changes"}}
+ const m=M[k],mf=window._mf,btn=$("#sv"),o={};btn.disabled=true;btn.textContent="Saving…";
+ try{for(const f of F(m)){const el=mf.elements[f.k];if(!el)continue;
+  if(f.t==="bool")o[f.k]=el.checked;
+  else if(f.t==="number")o[f.k]=+el.value||0;
+  else if(f.t==="image"||f.t==="file"){const file=mf.elements[f.k+"_file"].files[0];o[f.k]=el.value||null;
+   if(file){const p=`${k}/${Date.now()}-${file.name.replace(/[^\w.-]/g,"_")}`;const u=await sb.storage.from("media").upload(p,file,{upsert:true});if(u.error)throw u.error;o[f.k]=sb.storage.from("media").getPublicUrl(p).data.publicUrl}}
+  else o[f.k]=el.value.trim()}
+ if(m.cat)o.category=m.cat;
+ if(m.table==="blog_posts")o.slug=(o.title||"post").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+ let r;for(let n=0;n<6;n++){r=m.single?await sb.from(m.table).upsert({id:1,...o}):row.id?await sb.from(m.table).update(o).eq("id",row.id):await sb.from(m.table).insert(o);
+  const c=/'(\w+)' column/.exec(r.error?.message||"");if(c&&c[1] in o)delete o[c[1]];else break}
+ if(r.error)throw r.error;toast("Saved");$("#modal").hidden=true;inline?openForm(k,null,true):list(k)}
+ catch(e){toast("Could not save: "+e.message);btn.disabled=false;btn.textContent="Save changes"}}
 function ask(msg,ok){return new Promise(r=>{const del=/delete/i.test(ok||""),d=document.createElement("div");d.className="modal";d.innerHTML=`<div class="mbox cbox"><div class="cico">${del?"🗑":"⬇"}</div><p></p><div class="acts"><button type="button" class="btn sec" data-v="0">Cancel</button><button type="button" class="btn ${del?"del":""}" data-v="1">${ok||"Continue"}</button></div></div>`;d.querySelector("p").textContent=msg;const f=v=>{d.remove();r(v)};d.onclick=e=>{const v=e.target.dataset&&e.target.dataset.v;if(v!==undefined)f(v==="1");else if(e.target===d)f(false)};d.onkeydown=e=>{if(e.key==="Escape")f(false)};document.body.appendChild(d);d.querySelector("[data-v='1']").focus()})}
 function qa(k){if(location.hash==="#"+k)route();else location.hash="#"+k;setTimeout(()=>{const a=$("#add");if(a&&!a.hidden)a.click()},300)}
 function countUp(root){if(matchMedia("(prefers-reduced-motion:reduce)").matches)return;root.querySelectorAll("[data-n]").forEach(el=>{const n=+el.dataset.n,t0=performance.now(),f=t=>{const q=Math.min(1,(t-t0)/900);el.textContent=Math.round(n*(1-Math.pow(1-q,3)));if(q<1)requestAnimationFrame(f)};requestAnimationFrame(f)})}
@@ -797,7 +729,21 @@ function loginMsg(e){const m=(e&&e.message)||String(e);
  if(/fetch|network|load failed/i.test(m))return "Supabase se connect nahi ho paa raha. Internet check karo, aur Supabase project paused to nahi hai ye dekho. ["+m+"]";
  return "Sign in nahi hua. ["+m+"]"}
 function showLogin(msg){document.body.classList.add("noauth");$("#login").hidden=false;
-  const er=$("#lerr"),b=$("#lgo");er.style.color="";er.textContent=msg||"";b.disabled=false;b.textContent="Sign in";
-  $("#le").value="";$("#lp").value="";}
-boot().catch(e=>{console.error(e);showLogin(loginMsg(e))});
+ const er=$("#lerr"),b=$("#lgo");er.style.color="";er.textContent=msg||"";b.disabled=false;b.textContent="Sign in";
+ const go=async()=>{if(b.disabled)return;b.disabled=true;b.textContent="Signing in…";er.style.color="var(--mut)";er.textContent="Sign in ho raha hai…";
+  try{
+   const email=$("#le").value.trim(),password=$("#lp").value;
+   if(!email||!password)throw new Error("Email aur password dono bharo.");
+   const{error}=await sb.auth.signInWithPassword({email,password});
+   if(error)throw error;
+   er.textContent="Password sahi hai. Admin check ho raha hai…";
+   const{data:adm,error:ae}=await sb.rpc("is_admin");
+   if(ae||!adm){await sb.auth.signOut();throw ae||new Error("NOTADMIN")}
+   er.textContent="Login ho gaya, dashboard khul raha hai…";
+   $("#login").hidden=true;
+   await boot()
+  }catch(e){console.error(e);$("#login").hidden=false;document.body.classList.add("noauth");er.style.color="";er.textContent=loginMsg(e);b.disabled=false;b.textContent="Sign in"}};
+ b.onclick=go;$("#lf").onsubmit=e=>e.preventDefault();
+ ["#le","#lp"].forEach(i=>$(i).onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();go()}})}
+boot().catch(e=>{document.body.classList.remove("noauth");$("#view").innerHTML='<p class="empty">Something went wrong: '+esc(e.message)+'</p>'});
 </script></body></html>
