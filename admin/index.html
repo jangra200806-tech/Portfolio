@@ -106,7 +106,7 @@ input[type=checkbox]{accent-color:#7C3AED;width:18px;height:18px}
 <div class="pagehd" hidden><h1 id="ttl"></h1><button id="add" class="btn" hidden>Add new</button></div><section id="view"><p class="empty">Loading…</p></section></main>
 <div id="login" class="login"><form id="lf" class="lbox"><div class="brand"><b>N</b><span>Portfolio Admin</span></div><h1>Sign in <small style="font-size:.6rem;opacity:.5">v4</small></h1>
 <label>Email<input id="le" type="email" required autocomplete="username"></label><label>Password<input id="lp" type="password" required autocomplete="current-password"></label>
-<p id="lerr" class="err" role="alert"></p><button type="button" class="btn" id="lgo">Sign in</button></form></div>
+<p id="lerr" class="err" role="alert"></p><button type="submit" class="btn" id="lgo">Sign in</button></form></div>
 <div id="modal" class="modal" hidden><form id="mf" class="mbox"></form></div><div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>if(typeof supabase==="undefined"){document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"><\/script>')}</script>
@@ -119,8 +119,32 @@ window.CONFIG = {
 <script>if(typeof supabase==="undefined"){document.body.innerHTML="<p style='padding:30px;font-family:sans-serif'>Could not load the Supabase library. Check your internet connection and reload.</p>";throw new Error("no supabase")}
 const sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
 const $=s=>document.querySelector(s);
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&","<":"<",">":">",'"':""","'":"'"}[c]));
 const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),2600)};
+
+// Immediate login handler setup - ensures login works even before boot() completes
+(function setupLoginFallback(){
+  const form=$("#lf"), btn=$("#lgo"), err=$("#lerr");
+  if(form && btn){
+    const attemptLogin=async(e)=>{if(e)e.preventDefault();if(btn.disabled)return;
+      btn.disabled=true;btn.textContent="Signing in…";err.style.color="var(--mut)";err.textContent="Sign in ho raha hai…";
+      try{
+        const email=$("#le").value.trim(), password=$("#lp").value;
+        if(!email||!password)throw new Error("Email aur password dono bharo.");
+        const{error}=await sb.auth.signInWithPassword({email,password});
+        if(error)throw error;
+        err.textContent="Password sahi hai. Admin check ho raha hai…";
+        const{data:adm,error:ae}=await sb.rpc("is_admin");
+        if(ae||!adm){await sb.auth.signOut();throw ae||new Error("NOTADMIN")}
+        err.textContent="Login ho gaya, dashboard khul raha hai…";
+        $("#login").hidden=true;
+        document.body.classList.remove("noauth");
+        await boot();
+      }catch(e){console.error("Login error:",e);$("#login").hidden=false;document.body.classList.add("noauth");err.style.color="";err.textContent=loginMsg(e);btn.disabled=false;btn.textContent="Sign in"}};
+    form.onsubmit=attemptLogin;btn.onclick=attemptLogin;
+    ["#le","#lp"].forEach(sel=>{const el=$(sel);if(el)el.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();attemptLogin()}}});
+  }
+})();
 // field format: key:type:Label  (types: text, area, number, bool, image, file)
 const pub=["sort:number:Display order","published:bool:Show on website"];
 const gal=(c,label,icon)=>({label,icon,table:"gallery_items",cat:c,fields:["title:text:Title","description:area:Description","image_url:image:Image",...pub]});
@@ -735,21 +759,20 @@ function loginMsg(e){const m=(e&&e.message)||String(e);
  if(/fetch|network|load failed/i.test(m))return "Supabase se connect nahi ho paa raha. Internet check karo, aur Supabase project paused to nahi hai ye dekho. ["+m+"]";
  return "Sign in nahi hua. ["+m+"]"}
 function showLogin(msg){document.body.classList.add("noauth");$("#login").hidden=false;
- const er=$("#lerr"),b=$("#lgo");er.style.color="";er.textContent=msg||"";b.disabled=false;b.textContent="Sign in";
- const go=async()=>{if(b.disabled)return;b.disabled=true;b.textContent="Signing in…";er.style.color="var(--mut)";er.textContent="Sign in ho raha hai…";
-  try{
-   const email=$("#le").value.trim(),password=$("#lp").value;
-   if(!email||!password)throw new Error("Email aur password dono bharo.");
-   const{error}=await sb.auth.signInWithPassword({email,password});
-   if(error)throw error;
-   er.textContent="Password sahi hai. Admin check ho raha hai…";
-   const{data:adm,error:ae}=await sb.rpc("is_admin");
-   if(ae||!adm){await sb.auth.signOut();throw ae||new Error("NOTADMIN")}
-   er.textContent="Login ho gaya, dashboard khul raha hai…";
-   $("#login").hidden=true;
-   await boot()
-  }catch(e){console.error(e);$("#login").hidden=false;document.body.classList.add("noauth");er.style.color="";er.textContent=loginMsg(e);b.disabled=false;b.textContent="Sign in"}};
- b.onclick=go;$("#lf").onsubmit=e=>e.preventDefault();
- ["#le","#lp"].forEach(i=>$(i).onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();go()}})}
+  const er=$("#lerr"),form=$("#lf"),b=$("#lgo");er.style.color="";er.textContent=msg||"";b.disabled=false;b.textContent="Sign in";
+  const go=async(e)=>{if(e)e.preventDefault();if(b.disabled)return;b.disabled=true;b.textContent="Signing in…";er.style.color="var(--mut)";er.textContent="Sign in ho raha hai…";
+   try{
+    const email=$("#le").value.trim(),password=$("#lp").value;
+    if(!email||!password)throw new Error("Email aur password dono bharo.");
+    const{error}=await sb.auth.signInWithPassword({email,password});
+    if(error)throw error;
+    er.textContent="Password sahi hai. Admin check ho raha hai…";
+    const{data:adm,error:ae}=await sb.rpc("is_admin");
+    if(ae||!adm){await sb.auth.signOut();throw ae||new Error("NOTADMIN")}
+    er.textContent="Login ho gaya, dashboard khul raha hai…";
+    $("#login").hidden=true;
+    await boot()
+   }catch(e){console.error(e);$("#login").hidden=false;document.body.classList.add("noauth");er.style.color="";er.textContent=loginMsg(e);b.disabled=false;b.textContent="Sign in"}};
+  form.onsubmit=go;b.onclick=go;["#le","#lp"].forEach(i=>$(i).onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();go()}})}
 boot().catch(e=>{console.error(e);showLogin(loginMsg(e))});
 </script></body></html>
